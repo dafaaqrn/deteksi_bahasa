@@ -15,15 +15,18 @@ class _CameraScreenState extends State<CameraScreen> {
   List<CameraDescription> _cameras = [];
   int _selectedCameraIndex = 0;
   bool _isInitialized = false;
+  bool _isSwitchingCamera = false; // guard baru
   String? _errorMessage;
 
   HandLandmarkerPlugin? _plugin;
   StreamSubscription<List<Hand>>? _landmarkSubscription;
 
-  // Buffer untuk 1 sequence = 30 frame x 126 fitur
   static const int sequenceLength = 30;
   final List<List<double>> _frameBuffer = [];
-  List<Hand> _currentHands = [];
+
+  // Ganti dari field biasa + setState, jadi ValueNotifier (hindari rebuild seluruh layar)
+  final ValueNotifier<int> _handCountNotifier = ValueNotifier(0);
+  final ValueNotifier<int> _bufferProgressNotifier = ValueNotifier(0);
 
   @override
   void initState() {
@@ -56,40 +59,39 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _startCamera(int index) async {
-    // Hentikan plugin & stream lama dulu
-    await _landmarkSubscription?.cancel();
-    _landmarkSubscription = null;
-    await _controller?.stopImageStream();
-    if (_controller != null) {
-      await _controller!.dispose();
-    }
-    _plugin?.dispose();
-    _plugin = null;
-
-    setState(() {
-      _controller = null;
-      _isInitialized = false;
-      _frameBuffer.clear();
-      _currentHands = [];
-    });
-
-    final newController = CameraController(
-      _cameras[index],
-      ResolutionPreset.medium,
-      enableAudio: false,
-    );
+    if (_isSwitchingCamera) return; // cegah proses numpuk
+    _isSwitchingCamera = true;
 
     try {
+      await _landmarkSubscription?.cancel();
+      _landmarkSubscription = null;
+      await _controller?.stopImageStream();
+      await _controller?.dispose();
+      _plugin?.dispose();
+      _plugin = null;
+
+      setState(() {
+        _controller = null;
+        _isInitialized = false;
+        _frameBuffer.clear();
+      });
+      _handCountNotifier.value = 0;
+      _bufferProgressNotifier.value = 0;
+
+      final newController = CameraController(
+        _cameras[index],
+        ResolutionPreset.medium,
+        enableAudio: false,
+      );
+
       await newController.initialize();
 
-      // Inisialisasi plugin hand_landmarker
       final newPlugin = HandLandmarkerPlugin.create(
         numHands: 2,
         minHandDetectionConfidence: 0.6,
-        delegate: HandLandmarkerDelegate.cpu, // CPU karena laptop dev tidak ada GPU; HP tetap bisa pakai gpu kalau mau nanti dites performanya
+        delegate: HandLandmarkerDelegate.cpu,
       );
 
-      // Dengarkan hasil deteksi landmark
       _landmarkSubscription = newPlugin.landmarkStream.listen(_onLandmarksDetected);
 
       await newController.startImageStream((image) {
@@ -107,25 +109,23 @@ class _CameraScreenState extends State<CameraScreen> {
       setState(() {
         _errorMessage = 'Gagal inisialisasi kamera: $e';
       });
+    } finally {
+      _isSwitchingCamera = false;
     }
   }
 
   void _onLandmarksDetected(List<Hand> hands) {
-    if (!mounted) return;
+    // Tidak pakai setState di sini -> hindari rebuild seluruh layar tiap frame
+    _handCountNotifier.value = hands.length;
 
-    setState(() {
-      _currentHands = hands;
-    });
-
-    // Bangun feature vector 126 nilai: slot ditentukan posisi X (kiri->kanan),
-    // BUKAN handedness, supaya konsisten dengan collect_data.py di ml-model.
     final featureVector = _buildFeatureVector(hands);
-
     _frameBuffer.add(featureVector);
+    _bufferProgressNotifier.value = _frameBuffer.length;
 
     if (_frameBuffer.length >= sequenceLength) {
       final sequence = List<List<double>>.from(_frameBuffer);
       _frameBuffer.clear();
+      _bufferProgressNotifier.value = 0;
       _onSequenceReady(sequence);
     }
   }
@@ -135,7 +135,6 @@ class _CameraScreenState extends State<CameraScreen> {
     List<double> slotB = List.filled(21 * 3, 0.0);
 
     if (hands.isNotEmpty) {
-      // urutkan tangan berdasarkan posisi X landmark wrist (index 0), kiri ke kanan
       final sortedHands = List<Hand>.from(hands)
         ..sort((a, b) => a.landmarks[0].x.compareTo(b.landmarks[0].x));
 
@@ -147,7 +146,7 @@ class _CameraScreenState extends State<CameraScreen> {
       }
     }
 
-    return [...slotA, ...slotB]; // total 126 nilai
+    return [...slotA, ...slotB];
   }
 
   List<double> _flattenLandmarks(Hand hand) {
@@ -160,12 +159,11 @@ class _CameraScreenState extends State<CameraScreen> {
 
   void _onSequenceReady(List<List<double>> sequence) {
     // TODO: setelah model .tflite siap, panggil inference di sini.
-    // Untuk sekarang, baru tampilkan info bahwa 1 sequence (30 frame) sudah terkumpul.
     debugPrint('Sequence siap: ${sequence.length} frame x ${sequence[0].length} fitur');
   }
 
   void _switchCamera() {
-    if (_cameras.length < 2) return;
+    if (_cameras.length < 2 || _isSwitchingCamera) return;
     _selectedCameraIndex = (_selectedCameraIndex + 1) % _cameras.length;
     _startCamera(_selectedCameraIndex);
   }
@@ -176,6 +174,8 @@ class _CameraScreenState extends State<CameraScreen> {
     _controller?.stopImageStream();
     _controller?.dispose();
     _plugin?.dispose();
+    _handCountNotifier.dispose();
+    _bufferProgressNotifier.dispose();
     super.dispose();
   }
 
@@ -221,7 +221,6 @@ class _CameraScreenState extends State<CameraScreen> {
               child: CameraPreview(_controller!),
             ),
           ),
-          // Indikator kecil: jumlah tangan terdeteksi + progress buffer frame
           Positioned(
             top: 16,
             left: 16,
@@ -231,9 +230,19 @@ class _CameraScreenState extends State<CameraScreen> {
                 color: Colors.black54,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                'Tangan terdeteksi: ${_currentHands.length} | Frame: ${_frameBuffer.length}/$sequenceLength',
-                style: const TextStyle(color: Colors.white, fontSize: 12),
+              child: ValueListenableBuilder<int>(
+                valueListenable: _handCountNotifier,
+                builder: (context, handCount, _) {
+                  return ValueListenableBuilder<int>(
+                    valueListenable: _bufferProgressNotifier,
+                    builder: (context, bufferCount, _) {
+                      return Text(
+                        'Tangan terdeteksi: $handCount | Frame: $bufferCount/$sequenceLength',
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                      );
+                    },
+                  );
+                },
               ),
             ),
           ),
