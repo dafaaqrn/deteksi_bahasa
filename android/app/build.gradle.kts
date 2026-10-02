@@ -15,7 +15,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.deteksi_bahasa"
-        minSdk = flutter.minSdkVersion
+        minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
