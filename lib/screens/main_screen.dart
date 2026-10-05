@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'dictionary_screen.dart';
-import '../widgets/coming_soon_screen.dart';
+import 'riwayat_screen.dart';
+import 'profile_screen.dart';
+import '../app_colors.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -22,10 +24,10 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      HomeScreen(),
-      DictionaryScreen(),
-      const ComingSoonScreen(title: 'Riwayat', icon: Icons.history),
-      const ComingSoonScreen(title: 'Profil', icon: Icons.person),
+      const HomeScreen(),
+      const DictionaryScreen(),
+      const RiwayatScreen(),
+      const ProfileScreen(),
     ];
 
     return Scaffold(
@@ -36,8 +38,10 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.blue,
-        unselectedItemColor: Colors.grey,
+        backgroundColor: AppColors.surfaceContainerLowest,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: AppColors.onSurfaceVariant,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
         onTap: _goToTab,
         items: const [
           BottomNavigationBarItem(
