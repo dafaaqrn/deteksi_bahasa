@@ -1,0 +1,210 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+
+import 'api_config.dart';
+
+class AuthUser {
+  final int id;
+  final String email;
+  final String username;
+
+  const AuthUser({required this.id, required this.email, required this.username});
+
+  factory AuthUser.fromJson(Map<String, dynamic> json) => AuthUser(
+        id: json['id'] as int,
+        email: json['email'] as String,
+        username: json['username'] as String,
+      );
+
+  Map<String, dynamic> toJson() => {'id': id, 'email': email, 'username': username};
+}
+
+/// Error yang pesannya aman ditampilkan langsung ke pengguna.
+class AuthException implements Exception {
+  final String message;
+  const AuthException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+enum AuthStatus { unknown, authenticated, unauthenticated }
+
+class AuthService extends ChangeNotifier {
+  AuthService._();
+  static final AuthService instance = AuthService._();
+
+  static const _tokenKey = 'access_token';
+  static const _userKey = 'user_json';
+
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+
+  AuthStatus _status = AuthStatus.unknown;
+  AuthUser? _user;
+  String? _token;
+
+  AuthStatus get status => _status;
+  AuthUser? get user => _user;
+  String? get token => _token;
+
+  /// Header siap pakai untuk endpoint yang butuh login.
+  Map<String, String> get authHeaders => {
+        'Content-Type': 'application/json',
+        if (_token != null) 'Authorization': 'Bearer $_token',
+      };
+
+  /// Dipanggil sekali saat app dibuka: baca sesi tersimpan.
+  /// Kalau ada sesi, langsung dianggap login (app tetap bisa dipakai OFFLINE),
+  /// lalu token dicek ke server di latar belakang.
+  Future<void> init() async {
+    try {
+      _token = await _storage.read(key: _tokenKey);
+      final userJson = await _storage.read(key: _userKey);
+      if (_token != null && userJson != null) {
+        _user = AuthUser.fromJson(jsonDecode(userJson) as Map<String, dynamic>);
+        _status = AuthStatus.authenticated;
+        notifyListeners();
+        unawaited(_verifyTokenInBackground());
+        return;
+      }
+    } catch (_) {
+      // data tersimpan rusak / tidak terbaca: anggap belum login
+      await _clearLocal();
+    }
+    _status = AuthStatus.unauthenticated;
+    notifyListeners();
+  }
+
+  Future<void> register({
+    required String email,
+    required String username,
+    required String password,
+  }) async {
+    final body = await _post('/api/auth/register', {
+      'email': email,
+      'username': username,
+      'password': password,
+    });
+    await _saveSession(body);
+  }
+
+  Future<void> login({required String username, required String password}) async {
+    final body = await _post('/api/auth/login', {
+      'username': username,
+      'password': password,
+    });
+    await _saveSession(body);
+  }
+
+  /// Logout selalu berhasil di HP, walau server tidak terjangkau.
+  Future<void> logout() async {
+    final currentToken = _token;
+    await _clearLocal();
+    _status = AuthStatus.unauthenticated;
+    notifyListeners();
+
+    if (currentToken != null) {
+      try {
+        await http
+            .post(
+              Uri.parse('${ApiConfig.baseUrl}/api/auth/logout'),
+              headers: {'Authorization': 'Bearer $currentToken'},
+            )
+            .timeout(ApiConfig.timeout);
+      } catch (_) {
+        // Offline: token terhapus dari HP, tapi di server baru nonaktif saat kedaluwarsa (7 hari).
+      }
+    }
+  }
+
+  // ---------- internal ----------
+
+  Future<void> _verifyTokenInBackground() async {
+    try {
+      final response = await http
+          .get(Uri.parse('${ApiConfig.baseUrl}/api/auth/me'), headers: authHeaders)
+          .timeout(ApiConfig.timeout);
+      if (response.statusCode == 401) {
+        // token kedaluwarsa / sudah di-logout dari tempat lain
+        await _clearLocal();
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+      }
+    } catch (_) {
+      // offline atau server mati: biarkan tetap login
+    }
+  }
+
+  Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> payload) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('${ApiConfig.baseUrl}$path'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(payload),
+          )
+          .timeout(ApiConfig.timeout);
+
+      final decoded = _decode(response.body);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return decoded;
+      }
+      throw AuthException(
+        decoded['error']?.toString() ?? 'Terjadi kesalahan (kode ${response.statusCode})',
+      );
+    } on TimeoutException {
+      throw const AuthException('Server tidak merespons. Pastikan backend berjalan.');
+    } on SocketException {
+      throw const AuthException(
+        'Tidak bisa terhubung ke server. Pastikan HP dan laptop di WiFi yang sama.',
+      );
+    } on http.ClientException {
+      throw const AuthException(
+        'Tidak bisa terhubung ke server. Pastikan HP dan laptop di WiFi yang sama.',
+      );
+    }
+  }
+
+  Map<String, dynamic> _decode(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      return decoded is Map<String, dynamic> ? decoded : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> _saveSession(Map<String, dynamic> body) async {
+    final token = body['access_token'];
+    final userJson = body['user'];
+    if (token is! String || userJson is! Map<String, dynamic>) {
+      throw const AuthException('Respons server tidak sesuai.');
+    }
+
+    _token = token;
+    _user = AuthUser.fromJson(userJson);
+    try {
+      await _storage.write(key: _tokenKey, value: token);
+      await _storage.write(key: _userKey, value: jsonEncode(_user!.toJson()));
+    } catch (_) {
+      // gagal menyimpan: tetap login untuk sesi ini, hanya tidak bertahan setelah app ditutup
+    }
+
+    _status = AuthStatus.authenticated;
+    notifyListeners();
+  }
+
+  Future<void> _clearLocal() async {
+    _token = null;
+    _user = null;
+    try {
+      await _storage.delete(key: _tokenKey);
+      await _storage.delete(key: _userKey);
+    } catch (_) {}
+  }
+}
