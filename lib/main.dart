@@ -34,7 +34,7 @@ class MyApp extends StatelessWidget {
           error: AppColors.error,
         ),
         scaffoldBackgroundColor: AppColors.surface,
-        textTheme: GoogleFonts.plusJakartaSansTextTheme(),
+                fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
       ),
       home: const IntroductionAnimationScreen(),
     );
