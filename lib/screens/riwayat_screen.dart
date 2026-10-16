@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../app_colors.dart';
+import '../services/api_config.dart';
 
 class RiwayatScreen extends StatefulWidget {
   const RiwayatScreen({super.key});
@@ -11,9 +12,6 @@ class RiwayatScreen extends StatefulWidget {
 }
 
 class _RiwayatScreenState extends State<RiwayatScreen> {
-  // TODO: Ganti IP ini sesuai IP laptop backend kamu saat ini (bisa berubah tiap ganti jaringan)
-  static const String _baseUrl = 'http://192.168.100.124:5000';
-
   List<dynamic> _logs = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -32,8 +30,8 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
 
     try {
       final response = await http
-          .get(Uri.parse('$_baseUrl/api/detection-logs?limit=50'))
-          .timeout(const Duration(seconds: 10));
+          .get(Uri.parse('${ApiConfig.baseUrl}/api/detection-logs?limit=50'))
+          .timeout(ApiConfig.timeout);
 
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
@@ -60,9 +58,8 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
     if (dt == null) return isoString;
     final local = dt.toLocal();
     final now = DateTime.now();
-    final isToday = local.year == now.year &&
-        local.month == now.month &&
-        local.day == now.day;
+    final isToday =
+        local.year == now.year && local.month == now.month && local.day == now.day;
     final time =
         '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
     if (isToday) return 'Hari ini, $time';
@@ -140,7 +137,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: _logs.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final log = _logs[index];
         final word = log['predicted_word'] ?? '-';
