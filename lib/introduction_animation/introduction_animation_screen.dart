@@ -6,7 +6,7 @@ import 'package:deteksi_bahasa/introduction_animation/components/splash_view.dar
 import 'package:deteksi_bahasa/introduction_animation/components/top_back_skip_view.dart';
 import 'package:deteksi_bahasa/introduction_animation/components/welcome_view.dart';
 import 'package:flutter/material.dart';
-import 'package:deteksi_bahasa/screens/main_screen.dart';
+import 'package:deteksi_bahasa/screens/auth_gate.dart';
 
 class IntroductionAnimationScreen extends StatefulWidget {
   const IntroductionAnimationScreen({super.key});
@@ -115,7 +115,7 @@ class _IntroductionAnimationScreenState
   void _signUpClick() {
   Navigator.pushReplacement(
     context,
-    MaterialPageRoute(builder: (context) => const MainScreen()),
+    MaterialPageRoute(builder: (context) => const AuthGate()),
   );
 }
 }
