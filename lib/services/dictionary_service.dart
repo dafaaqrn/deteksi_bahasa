@@ -7,7 +7,7 @@ class DictionaryService {
   // - Emulator Android  -> 'http://10.0.2.2:5000/api'
   // - HP fisik (WiFi sama dengan laptop) -> 'http://IP_LAPTOP_KAMU:5000/api'
   //   contoh: 'http://192.168.1.10:5000/api'
-  static const String baseUrl = 'http://10.0.2.2:5000/api';
+  static const String baseUrl = 'http://192.168.100.142:5000/api';
 
   Future<List<DictionaryEntry>> fetchDictionary({String? search}) async {
     final uri = Uri.parse('$baseUrl/dictionary').replace(
