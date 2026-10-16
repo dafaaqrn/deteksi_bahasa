@@ -4,6 +4,6 @@
 class ApiConfig {
   ApiConfig._();
 
-  static const String baseUrl = 'http://192.168.100.124:5000';
+  static const String baseUrl = 'http://192.168.100.142:5000';
   static const Duration timeout = Duration(seconds: 10);
 }
