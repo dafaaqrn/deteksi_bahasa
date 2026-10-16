@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app_colors.dart';
+import '../services/auth_service.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -9,26 +10,38 @@ class ProfileScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-          children: [
-            _buildProfileHeader(),
-            const SizedBox(height: 20),
-            _buildStatsRow(),
-            const SizedBox(height: 24),
-            _buildMenuSection(context),
-          ],
+        child: ListenableBuilder(
+          listenable: AuthService.instance,
+          builder: (context, _) {
+            final user = AuthService.instance.user;
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+              children: [
+                _buildProfileHeader(user),
+                const SizedBox(height: 20),
+                _buildStatsRow(),
+                const SizedBox(height: 24),
+                _buildMenuSection(context),
+                const SizedBox(height: 16),
+                _buildLogoutButton(context),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(AuthUser? user) {
+    final username = user?.username ?? 'Pengguna';
+    final initial = username.isNotEmpty ? username[0].toUpperCase() : '?';
+
     return Column(
       children: [
         Container(
           width: 88,
           height: 88,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: AppColors.primaryFixed,
@@ -37,11 +50,18 @@ class ProfileScreen extends StatelessWidget {
               BoxShadow(color: AppColors.onSurface.withValues(alpha: 0.08), blurRadius: 16),
             ],
           ),
-          child: Icon(Icons.person, size: 44, color: AppColors.primary),
+          child: Text(
+            initial,
+            style: TextStyle(
+              fontSize: 38,
+              fontWeight: FontWeight.w800,
+              color: AppColors.primary,
+            ),
+          ),
         ),
         const SizedBox(height: 12),
         Text(
-          'Dafa',
+          username,
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
@@ -50,7 +70,7 @@ class ProfileScreen extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          'Belajar BISINDO sejak Oktober 2026',
+          user?.email ?? '',
           style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
         ),
       ],
@@ -148,12 +168,73 @@ class ProfileScreen extends StatelessWidget {
               if (!isLast)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Divider(height: 1, color: AppColors.outlineVariant.withValues(alpha: 0.3)),
+                  child: Divider(
+                    height: 1,
+                    color: AppColors.outlineVariant.withValues(alpha: 0.3),
+                  ),
                 ),
             ],
           );
         }).toList(),
       ),
     );
+  }
+
+  Widget _buildLogoutButton(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: AppColors.onSurface.withValues(alpha: 0.05), blurRadius: 10),
+        ],
+      ),
+      child: ListTile(
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppColors.errorContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(Icons.logout, color: AppColors.error, size: 20),
+        ),
+        title: Text(
+          'Keluar',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+            color: AppColors.error,
+          ),
+        ),
+        onTap: () => _confirmLogout(context),
+      ),
+    );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Keluar dari akun?'),
+        content: const Text('Kamu perlu login lagi untuk memakai aplikasi.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      // AuthGate otomatis kembali ke layar login setelah ini.
+      await AuthService.instance.logout();
+    }
   }
 }
