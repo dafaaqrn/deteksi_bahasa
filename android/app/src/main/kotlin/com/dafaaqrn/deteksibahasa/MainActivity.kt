@@ -1,4 +1,4 @@
-package com.example.deteksi_bahasa
+package com.dafaaqrn.deteksibahasa
 
 import io.flutter.embedding.android.FlutterActivity
 

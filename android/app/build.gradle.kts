@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.deteksi_bahasa"
+    namespace = "com.dafaaqrn.deteksibahasa"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "28.2.13676358"
 
@@ -14,7 +14,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.deteksi_bahasa"
+        applicationId = "com.dafaaqrn.deteksibahasa"
         minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
