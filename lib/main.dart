@@ -20,7 +20,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Deteksi Bahasa Isyarat',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
+            theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.light(
           primary: AppColors.primary,
@@ -34,7 +34,7 @@ class MyApp extends StatelessWidget {
           error: AppColors.error,
         ),
         scaffoldBackgroundColor: AppColors.surface,
-                fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
+        fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
       ),
       home: const IntroductionAnimationScreen(),
     );
