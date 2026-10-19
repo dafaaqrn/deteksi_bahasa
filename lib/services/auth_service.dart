@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
 import 'api_config.dart';
@@ -27,7 +28,8 @@ class AuthUser {
 /// Error yang pesannya aman ditampilkan langsung ke pengguna.
 class AuthException implements Exception {
   final String message;
-  const AuthException(this.message);
+  final bool isCancelled;
+  const AuthException(this.message, {this.isCancelled = false});
 
   @override
   String toString() => message;
@@ -47,6 +49,7 @@ class AuthService extends ChangeNotifier {
   AuthStatus _status = AuthStatus.unknown;
   AuthUser? _user;
   String? _token;
+  bool _googleReady = false;
 
   AuthStatus get status => _status;
   AuthUser? get user => _user;
@@ -101,6 +104,38 @@ class AuthService extends ChangeNotifier {
     await _saveSession(body);
   }
 
+  /// Login/daftar pakai Google. Dialog pilih akun ditangani package
+  /// google_sign_in; id_token hasilnya dikirim ke backend untuk diverifikasi.
+  Future<void> loginWithGoogle() async {
+    if (ApiConfig.googleWebClientId.isEmpty) {
+      throw const AuthException('Login Google belum dikonfigurasi di aplikasi.');
+    }
+
+    try {
+      if (!_googleReady) {
+        await GoogleSignIn.instance.initialize(
+          serverClientId: ApiConfig.googleWebClientId,
+        );
+        _googleReady = true;
+      }
+
+      final account = await GoogleSignIn.instance.authenticate();
+      // Sinkron di v7 google_sign_in, BUKAN Future — jangan ditambah 'await'.
+      final idToken = account.authentication.idToken;
+      if (idToken == null) {
+        throw const AuthException('Google tidak mengembalikan token. Coba lagi.');
+      }
+
+      final body = await _post('/api/auth/google', {'id_token': idToken});
+      await _saveSession(body);
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw const AuthException('Login dibatalkan', isCancelled: true);
+      }
+      throw AuthException('Gagal login Google: ${e.description ?? e.code}');
+    }
+  }
+
   /// Logout selalu berhasil di HP, walau server tidak terjangkau.
   Future<void> logout() async {
     final currentToken = _token;
@@ -118,6 +153,14 @@ class AuthService extends ChangeNotifier {
             .timeout(ApiConfig.timeout);
       } catch (_) {
         // Offline: token terhapus dari HP, tapi di server baru nonaktif saat kedaluwarsa (7 hari).
+      }
+    }
+
+    if (_googleReady) {
+      try {
+        await GoogleSignIn.instance.signOut();
+      } catch (_) {
+        // tidak kritis, abaikan
       }
     }
   }
