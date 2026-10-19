@@ -49,11 +49,21 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _onGoogle() {
-    // TODO: dihubungkan ke Google Sign-In setelah setup Google Cloud selesai.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Login Google segera hadir')),
-    );
+    Future<void> _onGoogle() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      await AuthService.instance.loginWithGoogle();
+      // Sukses: AuthGate otomatis pindah ke halaman utama.
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      if (!e.isCancelled) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
