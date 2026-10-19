@@ -139,43 +139,50 @@ class ProfileScreen extends StatelessWidget {
           BoxShadow(color: AppColors.onSurface.withValues(alpha: 0.05), blurRadius: 10),
         ],
       ),
-      child: Column(
-        children: menuItems.map((item) {
-          final isLast = item == menuItems.last;
-          return Column(
-            children: [
-              ListTile(
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: item.$4,
-                    borderRadius: BorderRadius.circular(12),
+      // Material transparan: ListTile butuh ini supaya efek sentuh/ripple
+      // kelihatan, tapi warna Container di atas tetap yang dipakai.
+      child: Material(
+        type: MaterialType.transparency,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: menuItems.map((item) {
+            final isLast = item == menuItems.last;
+            return Column(
+              children: [
+                ListTile(
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: item.$4,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(item.$1, color: item.$3, size: 20),
                   ),
-                  child: Icon(item.$1, color: item.$3, size: 20),
-                ),
-                title: Text(
-                  item.$2,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                ),
-                trailing: Icon(Icons.chevron_right, color: AppColors.onSurfaceVariant),
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${item.$2} - segera hadir')),
-                  );
-                },
-              ),
-              if (!isLast)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Divider(
-                    height: 1,
-                    color: AppColors.outlineVariant.withValues(alpha: 0.3),
+                  title: Text(
+                    item.$2,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                   ),
+                  trailing: Icon(Icons.chevron_right, color: AppColors.onSurfaceVariant),
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${item.$2} - segera hadir')),
+                    );
+                  },
                 ),
-            ],
-          );
-        }).toList(),
+                if (!isLast)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Divider(
+                      height: 1,
+                      color: AppColors.outlineVariant.withValues(alpha: 0.3),
+                    ),
+                  ),
+              ],
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -189,25 +196,30 @@ class ProfileScreen extends StatelessWidget {
           BoxShadow(color: AppColors.onSurface.withValues(alpha: 0.05), blurRadius: 10),
         ],
       ),
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: AppColors.errorContainer,
-            borderRadius: BorderRadius.circular(12),
+      child: Material(
+        type: MaterialType.transparency,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.errorContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.logout, color: AppColors.error, size: 20),
           ),
-          child: Icon(Icons.logout, color: AppColors.error, size: 20),
-        ),
-        title: Text(
-          'Keluar',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-            color: AppColors.error,
+          title: Text(
+            'Keluar',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: AppColors.error,
+            ),
           ),
+          onTap: () => _confirmLogout(context),
         ),
-        onTap: () => _confirmLogout(context),
       ),
     );
   }
