@@ -6,4 +6,9 @@ class ApiConfig {
 
   static const String baseUrl = 'http://192.168.100.142:5000';
   static const Duration timeout = Duration(seconds: 10);
+
+  /// Web Client ID dari Google Cloud Console (bukan Android Client ID).
+  /// Harus SAMA PERSIS dengan GOOGLE_CLIENT_ID di .env backend.
+  static const String googleWebClientId =
+      '991130986638-vvha1ja6asp5mao3c6g7pt7jq82ckar6.apps.googleusercontent.com';
 }
