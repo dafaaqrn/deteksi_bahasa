@@ -199,21 +199,28 @@ class _AddWordFormState extends State<_AddWordForm> {
     super.dispose();
   }
 
-  Future<void> _handleSubmit() async {
-    if (!_formKey.currentState!.validate()) return;
+     Future<void> _handleSubmit() async {
+     if (!_formKey.currentState!.validate()) return;
+     setState(() => _isSubmitting = true);
 
-    setState(() => _isSubmitting = true);
-
-    await widget.onSubmit(
-      DictionaryEntry(
-        id: 0,
-        word: _wordController.text.trim(),
-        description: _descriptionController.text.trim(),
-        category: _selectedCategory,
-        submittedBy: 'Kamu',
-      ),
-    );
-  }
+     try {
+       await widget.onSubmit(
+         DictionaryEntry(
+           id: 0,
+           word: _wordController.text.trim(),
+           description: _descriptionController.text.trim(),
+           category: _selectedCategory,
+           submittedBy: 'Kamu',
+         ),
+       );
+     } catch (e) {
+       if (!mounted) return;
+       setState(() => _isSubmitting = false);
+       ScaffoldMessenger.of(context).showSnackBar(
+         SnackBar(content: Text('Gagal menyimpan: $e')),
+       );
+     }
+   }
 
   @override
   Widget build(BuildContext context) {
