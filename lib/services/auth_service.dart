@@ -13,16 +13,24 @@ class AuthUser {
   final int id;
   final String email;
   final String username;
+  final String? photoUrl;
 
-  const AuthUser({required this.id, required this.email, required this.username});
+  const AuthUser({
+    required this.id,
+    required this.email,
+    required this.username,
+    this.photoUrl,
+  });
 
   factory AuthUser.fromJson(Map<String, dynamic> json) => AuthUser(
         id: json['id'] as int,
         email: json['email'] as String,
         username: json['username'] as String,
+        photoUrl: json['photoUrl'] as String?,
       );
 
-  Map<String, dynamic> toJson() => {'id': id, 'email': email, 'username': username};
+  Map<String, dynamic> toJson() =>
+      {'id': id, 'email': email, 'username': username, 'photoUrl': photoUrl};
 }
 
 /// Error yang pesannya aman ditampilkan langsung ke pengguna.
