@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app_colors.dart';
+import '../services/auth_service.dart';
 import 'camera_screen.dart';
 import 'dictionary_screen.dart';
 
@@ -40,23 +41,30 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          children: [
-            _buildHeader(),
-            const SizedBox(height: 16),
-            _buildStatusBadges(),
-            const SizedBox(height: 20),
-            _buildHeroCard(),
-            const SizedBox(height: 24),
-            _buildQuickShortcuts(),
-            const SizedBox(height: 24),
-            _buildDailyTip(),
-            const SizedBox(height: 24),
-            _buildPromoCarousel(),
-            const SizedBox(height: 16),
-            _buildStreakCard(),
-          ],
+        // Dibungkus ListenableBuilder supaya nama di header otomatis
+        // update kalau ada perubahan data user (misal setelah login ulang).
+        child: ListenableBuilder(
+          listenable: AuthService.instance,
+          builder: (context, _) {
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 16),
+                _buildStatusBadges(),
+                const SizedBox(height: 20),
+                _buildHeroCard(),
+                const SizedBox(height: 24),
+                _buildQuickShortcuts(),
+                const SizedBox(height: 24),
+                _buildDailyTip(),
+                const SizedBox(height: 24),
+                _buildPromoCarousel(),
+                const SizedBox(height: 16),
+                _buildStreakCard(),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -64,40 +72,41 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ---------- HEADER ----------
   Widget _buildHeader() {
+    final username = AuthService.instance.user?.username ?? 'Pengguna';
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Text(
-                    'Halo, Dafa!',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.onSurface,
-                    ),
+              Flexible(
+                child: Text(
+                  'Halo, $username!',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurface,
                   ),
-                  const SizedBox(width: 6),
-                  const Text('👋', style: TextStyle(fontSize: 24)),
-                ],
+                ),
               ),
-
+              const SizedBox(width: 6),
+              const Text('👋', style: TextStyle(fontSize: 24)),
             ],
           ),
         ),
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.primaryFixed,
-            border: Border.all(color: AppColors.primaryFixed, width: 2),
+        IconButton(
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Notifikasi - segera hadir')),
+            );
+          },
+          style: IconButton.styleFrom(
+            backgroundColor: AppColors.surfaceContainerLowest,
+            shape: const CircleBorder(),
           ),
-          child: Icon(Icons.person, color: AppColors.primary),
+          icon: Icon(Icons.notifications_outlined, color: AppColors.onSurfaceVariant),
         ),
       ],
     );
