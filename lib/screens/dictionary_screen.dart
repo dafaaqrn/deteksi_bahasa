@@ -51,26 +51,28 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   }
 
   void _openAddWordSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => _AddWordForm(
-        onSubmit: (entry) async {
-          await _service.submitWord(entry);
-          Navigator.pop(context);
-          _loadData();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Kosakata berhasil ditambahkan')),
-            );
-          }
-        },
-      ),
-    );
-  }
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (sheetContext) => _AddWordForm(
+      onSubmit: (entry) async {
+        final navigator = Navigator.of(sheetContext);
+        final messenger = ScaffoldMessenger.of(context);
+
+        await _service.submitWord(entry);
+
+        navigator.pop();
+        _loadData();
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Kosakata berhasil ditambahkan')),
+        );
+      },
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
