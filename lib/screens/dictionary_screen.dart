@@ -26,6 +26,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     setState(() => _isLoading = true);
     try {
       final data = await _service.fetchDictionary();
+   if (!mounted) return;
       setState(() {
         _entries = data;
         _filteredEntries = data;
