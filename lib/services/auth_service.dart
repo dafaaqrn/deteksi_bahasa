@@ -173,6 +173,8 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  
+
   // ---------- internal ----------
 
   Future<void> _verifyTokenInBackground() async {
