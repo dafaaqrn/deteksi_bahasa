@@ -85,11 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const Text('👋', style: TextStyle(fontSize: 24)),
                 ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                'Siap berkomunikasi dan belajar BISINDO hari ini?',
-                style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
-              ),
+
             ],
           ),
         ),
