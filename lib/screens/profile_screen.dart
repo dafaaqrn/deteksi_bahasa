@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../app_colors.dart';
+import '../services/api_config.dart';
 import '../services/auth_service.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -17,7 +20,7 @@ class ProfileScreen extends StatelessWidget {
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
               children: [
-                _buildProfileHeader(user),
+                _ProfileAvatarHeader(user: user),
                 const SizedBox(height: 20),
                 _buildStatsRow(),
                 const SizedBox(height: 24),
@@ -29,51 +32,6 @@ class ProfileScreen extends StatelessWidget {
           },
         ),
       ),
-    );
-  }
-
-  Widget _buildProfileHeader(AuthUser? user) {
-    final username = user?.username ?? 'Pengguna';
-    final initial = username.isNotEmpty ? username[0].toUpperCase() : '?';
-
-    return Column(
-      children: [
-        Container(
-          width: 88,
-          height: 88,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.primaryFixed,
-            border: Border.all(color: AppColors.surfaceContainerLowest, width: 4),
-            boxShadow: [
-              BoxShadow(color: AppColors.onSurface.withValues(alpha: 0.08), blurRadius: 16),
-            ],
-          ),
-          child: Text(
-            initial,
-            style: TextStyle(
-              fontSize: 38,
-              fontWeight: FontWeight.w800,
-              color: AppColors.primary,
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          username,
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: AppColors.onSurface,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          user?.email ?? '',
-          style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
-        ),
-      ],
     );
   }
 
@@ -139,8 +97,6 @@ class ProfileScreen extends StatelessWidget {
           BoxShadow(color: AppColors.onSurface.withValues(alpha: 0.05), blurRadius: 10),
         ],
       ),
-      // Material transparan: ListTile butuh ini supaya efek sentuh/ripple
-      // kelihatan, tapi warna Container di atas tetap yang dipakai.
       child: Material(
         type: MaterialType.transparency,
         borderRadius: BorderRadius.circular(16),
@@ -245,8 +201,123 @@ class ProfileScreen extends StatelessWidget {
     );
 
     if (confirmed == true) {
-      // AuthGate otomatis kembali ke layar login setelah ini.
       await AuthService.instance.logout();
     }
+  }
+}
+
+/// Avatar + nama + email, dengan badge kamera untuk ganti foto.
+class _ProfileAvatarHeader extends StatefulWidget {
+  final AuthUser? user;
+  const _ProfileAvatarHeader({required this.user});
+
+  @override
+  State<_ProfileAvatarHeader> createState() => _ProfileAvatarHeaderState();
+}
+
+class _ProfileAvatarHeaderState extends State<_ProfileAvatarHeader> {
+  bool _uploading = false;
+
+  Future<void> _pickAndUpload() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+    if (picked == null || !mounted) return;
+
+    setState(() => _uploading = true);
+    try {
+      await AuthService.instance.uploadProfilePhoto(File(picked.path));
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final username = widget.user?.username ?? 'Pengguna';
+    final initial = username.isNotEmpty ? username[0].toUpperCase() : '?';
+    final photoUrl = widget.user?.photoUrl;
+
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: _uploading ? null : _pickAndUpload,
+          child: Stack(
+            children: [
+              Container(
+                width: 88,
+                height: 88,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primaryFixed,
+                  border: Border.all(color: AppColors.surfaceContainerLowest, width: 4),
+                  boxShadow: [
+                    BoxShadow(color: AppColors.onSurface.withValues(alpha: 0.08), blurRadius: 16),
+                  ],
+                ),
+                child: ClipOval(
+                  child: _uploading
+                      ? const Padding(
+                          padding: EdgeInsets.all(28),
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        )
+                      : (photoUrl != null
+                          ? Image.network(
+                              '${ApiConfig.baseUrl}$photoUrl',
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Text(
+                                initial,
+                                style: TextStyle(
+                                  fontSize: 38,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            )
+                          : Text(
+                              initial,
+                              style: TextStyle(
+                                fontSize: 38,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
+                              ),
+                            )),
+                ),
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primary,
+                    border: Border.all(color: AppColors.surfaceContainerLowest, width: 2),
+                  ),
+                  child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          username,
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.onSurface),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          widget.user?.email ?? '',
+          style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
+        ),
+      ],
+    );
   }
 }
