@@ -173,7 +173,48 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  
+    /// Upload/ganti foto profil. Melempar AuthException kalau gagal.
+  Future<void> uploadProfilePhoto(File imageFile) async {
+    if (_token == null) {
+      throw const AuthException('Belum login.');
+    }
+
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${ApiConfig.baseUrl}/api/auth/me/photo'),
+      );
+      request.headers['Authorization'] = 'Bearer $_token';
+      request.files.add(await http.MultipartFile.fromPath('photo', imageFile.path));
+
+      final streamedResponse = await request.send().timeout(ApiConfig.timeout);
+      final response = await http.Response.fromStream(streamedResponse);
+      final decoded = _decode(response.body);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw AuthException(
+          decoded['error']?.toString() ?? 'Gagal mengunggah foto (kode ${response.statusCode})',
+        );
+      }
+
+      final userJson = decoded['user'];
+      if (userJson is! Map<String, dynamic>) {
+        throw const AuthException('Respons server tidak sesuai.');
+      }
+
+      _user = AuthUser.fromJson(userJson);
+      try {
+        await _storage.write(key: _userKey, value: jsonEncode(_user!.toJson()));
+      } catch (_) {}
+      notifyListeners();
+    } on TimeoutException {
+      throw const AuthException('Server tidak merespons. Pastikan backend berjalan.');
+    } on SocketException {
+      throw const AuthException(
+        'Tidak bisa terhubung ke server. Pastikan HP dan laptop di WiFi yang sama.',
+      );
+    }
+  }
 
   // ---------- internal ----------
 
