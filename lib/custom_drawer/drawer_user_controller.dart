@@ -133,11 +133,9 @@ class _DrawerUserControllerState extends State<DrawerUserController>
                         screenIndex: widget.screenIndex ?? DrawerIndex.HOME,
                         iconAnimationController: iconAnimationController,
                         callBackIndex: (DrawerIndex indexType) {
-                          onDrawerClick();
-                          try {
-                            widget.onDrawerCall!(indexType);
-                          } catch (e) {}
-                        },
+  onDrawerClick();
+  widget.onDrawerCall?.call(indexType);
+},
                       ),
                     );
                   },
