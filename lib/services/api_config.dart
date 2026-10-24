@@ -4,7 +4,7 @@
 class ApiConfig {
   ApiConfig._();
 
-  static const String baseUrl = 'http://192.168.100.142:5000';
+  static const String baseUrl = 'https://mayflower-graceful-wipe.ngrok-free.dev';
   static const Duration timeout = Duration(seconds: 10);
 
   /// Web Client ID dari Google Cloud Console (bukan Android Client ID).

@@ -273,6 +273,95 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  /// Ganti password (akun yang sudah punya password) atau tambahkan password
+  /// pertama (akun yang daftar murni lewat Google). [currentPassword] boleh
+  /// null kalau akun belum pernah punya password.
+  Future<void> updatePassword({
+    String? currentPassword,
+    required String newPassword,
+  }) async {
+    if (_token == null) {
+      throw const AuthException('Belum login.');
+    }
+
+    try {
+      final response = await http
+          .patch(
+            Uri.parse('${ApiConfig.baseUrl}/api/auth/me/password'),
+            headers: authHeaders,
+            body: jsonEncode({
+              if (currentPassword != null) 'current_password': currentPassword,
+              'new_password': newPassword,
+            }),
+          )
+          .timeout(ApiConfig.timeout);
+
+      final decoded = _decode(response.body);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw AuthException(
+          decoded['error']?.toString() ?? 'Gagal mengubah password (kode ${response.statusCode})',
+        );
+      }
+
+      final userJson = decoded['user'];
+      if (userJson is Map<String, dynamic>) {
+        _user = AuthUser.fromJson(userJson);
+        try {
+          await _storage.write(key: _userKey, value: jsonEncode(_user!.toJson()));
+        } catch (_) {}
+        notifyListeners();
+      }
+    } on TimeoutException {
+      throw const AuthException('Server tidak merespons. Pastikan backend berjalan.');
+    } on SocketException {
+      throw const AuthException(
+        'Tidak bisa terhubung ke server. Pastikan HP dan laptop di WiFi yang sama.',
+      );
+    } on http.ClientException {
+      throw const AuthException(
+        'Tidak bisa terhubung ke server. Pastikan HP dan laptop di WiFi yang sama.',
+      );
+    }
+  }
+
+  /// Hapus akun secara permanen. Setelah berhasil, sesi lokal langsung
+  /// dihapus dan status berubah jadi unauthenticated.
+  Future<void> deleteAccount() async {
+    if (_token == null) {
+      throw const AuthException('Belum login.');
+    }
+
+    try {
+      final response = await http
+          .delete(
+            Uri.parse('${ApiConfig.baseUrl}/api/auth/me'),
+            headers: authHeaders,
+          )
+          .timeout(ApiConfig.timeout);
+
+      final decoded = _decode(response.body);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw AuthException(
+          decoded['error']?.toString() ?? 'Gagal menghapus akun (kode ${response.statusCode})',
+        );
+      }
+
+      await _clearLocal();
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+    } on TimeoutException {
+      throw const AuthException('Server tidak merespons. Pastikan backend berjalan.');
+    } on SocketException {
+      throw const AuthException(
+        'Tidak bisa terhubung ke server. Pastikan HP dan laptop di WiFi yang sama.',
+      );
+    } on http.ClientException {
+      throw const AuthException(
+        'Tidak bisa terhubung ke server. Pastikan HP dan laptop di WiFi yang sama.',
+      );
+    }
+  }
+
   // ---------- internal ----------
 
   Future<void> _verifyTokenInBackground() async {
