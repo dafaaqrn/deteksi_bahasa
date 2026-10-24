@@ -14,12 +14,16 @@ class AuthUser {
   final String email;
   final String username;
   final String? photoUrl;
+  final bool hasPassword;
+  final bool hasGoogle;
 
   const AuthUser({
     required this.id,
     required this.email,
     required this.username,
     this.photoUrl,
+    this.hasPassword = false,
+    this.hasGoogle = false,
   });
 
   factory AuthUser.fromJson(Map<String, dynamic> json) => AuthUser(
@@ -27,10 +31,18 @@ class AuthUser {
         email: json['email'] as String,
         username: json['username'] as String,
         photoUrl: json['photoUrl'] as String?,
+        hasPassword: json['has_password'] as bool? ?? false,
+        hasGoogle: json['has_google'] as bool? ?? false,
       );
 
-  Map<String, dynamic> toJson() =>
-      {'id': id, 'email': email, 'username': username, 'photoUrl': photoUrl};
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'email': email,
+        'username': username,
+        'photoUrl': photoUrl,
+        'has_password': hasPassword,
+        'has_google': hasGoogle,
+      };
 }
 
 /// Error yang pesannya aman ditampilkan langsung ke pengguna.
@@ -173,7 +185,7 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-    /// Upload/ganti foto profil. Melempar AuthException kalau gagal.
+  /// Upload/ganti foto profil. Melempar AuthException kalau gagal.
   Future<void> uploadProfilePhoto(File imageFile) async {
     if (_token == null) {
       throw const AuthException('Belum login.');
@@ -210,6 +222,51 @@ class AuthService extends ChangeNotifier {
     } on TimeoutException {
       throw const AuthException('Server tidak merespons. Pastikan backend berjalan.');
     } on SocketException {
+      throw const AuthException(
+        'Tidak bisa terhubung ke server. Pastikan HP dan laptop di WiFi yang sama.',
+      );
+    }
+  }
+
+  /// Ganti username. Melempar AuthException kalau gagal (format salah, sudah dipakai, dll).
+  Future<void> updateUsername(String newUsername) async {
+    if (_token == null) {
+      throw const AuthException('Belum login.');
+    }
+
+    try {
+      final response = await http
+          .patch(
+            Uri.parse('${ApiConfig.baseUrl}/api/auth/me/username'),
+            headers: authHeaders,
+            body: jsonEncode({'username': newUsername}),
+          )
+          .timeout(ApiConfig.timeout);
+
+      final decoded = _decode(response.body);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw AuthException(
+          decoded['error']?.toString() ?? 'Gagal mengubah username (kode ${response.statusCode})',
+        );
+      }
+
+      final userJson = decoded['user'];
+      if (userJson is! Map<String, dynamic>) {
+        throw const AuthException('Respons server tidak sesuai.');
+      }
+
+      _user = AuthUser.fromJson(userJson);
+      try {
+        await _storage.write(key: _userKey, value: jsonEncode(_user!.toJson()));
+      } catch (_) {}
+      notifyListeners();
+    } on TimeoutException {
+      throw const AuthException('Server tidak merespons. Pastikan backend berjalan.');
+    } on SocketException {
+      throw const AuthException(
+        'Tidak bisa terhubung ke server. Pastikan HP dan laptop di WiFi yang sama.',
+      );
+    } on http.ClientException {
       throw const AuthException(
         'Tidak bisa terhubung ke server. Pastikan HP dan laptop di WiFi yang sama.',
       );
