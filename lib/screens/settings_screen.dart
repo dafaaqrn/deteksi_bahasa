@@ -51,6 +51,33 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ],
                 ),
+                _SectionLabel('Keamanan'),
+                _SettingsCard(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.password_outlined,
+                      title: user?.hasPassword == true ? 'Ganti Password' : 'Tambahkan Password',
+                      subtitle: user?.hasPassword == true
+                          ? 'Ubah password akun'
+                          : 'Supaya bisa login tanpa Google juga',
+                      onTap: () => _showPasswordSheet(context, hasPassword: user?.hasPassword == true),
+                    ),
+                  ],
+                ),
+                _SectionLabel('Zona Berbahaya'),
+                _SettingsCard(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.delete_forever_outlined,
+                      title: 'Hapus Akun',
+                      subtitle: 'Akun dan data terkait dihapus permanen',
+                      titleColor: AppColors.error,
+                      iconColor: AppColors.error,
+                      iconBg: AppColors.errorContainer,
+                      onTap: () => _confirmDeleteAccount(context),
+                    ),
+                  ],
+                ),
               ],
             );
           },
@@ -66,6 +93,52 @@ class SettingsScreen extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => const _EditUsernameSheet(),
     );
+  }
+
+  void _showPasswordSheet(BuildContext context, {required bool hasPassword}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EditPasswordSheet(hasPassword: hasPassword),
+    );
+  }
+
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Hapus akun?'),
+        content: const Text(
+          'Tindakan ini permanen. Akun, foto profil, dan data login kamu akan '
+          'dihapus dan tidak bisa dikembalikan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Hapus Akun'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await AuthService.instance.deleteAccount();
+      if (context.mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } on AuthException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
   }
 }
 
@@ -130,6 +203,168 @@ class _EditUsernameSheetState extends State<_EditUsernameSheet> {
 
   @override
   Widget build(BuildContext context) {
+    return _BottomSheetShell(
+      title: 'Ubah Username',
+      formKey: _formKey,
+      saving: _saving,
+      onSave: _save,
+      fields: [
+        TextFormField(
+          controller: _controller,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          validator: _validate,
+          onFieldSubmitted: (_) => _saving ? null : _save(),
+          decoration: InputDecoration(
+            labelText: 'Username baru',
+            errorText: _errorText,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EditPasswordSheet extends StatefulWidget {
+  final bool hasPassword;
+  const _EditPasswordSheet({required this.hasPassword});
+
+  @override
+  State<_EditPasswordSheet> createState() => _EditPasswordSheetState();
+}
+
+class _EditPasswordSheetState extends State<_EditPasswordSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _currentController = TextEditingController();
+  final _newController = TextEditingController();
+  final _confirmController = TextEditingController();
+  bool _saving = false;
+  String? _errorText;
+
+  @override
+  void dispose() {
+    _currentController.dispose();
+    _newController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  String? _validateCurrent(String? value) {
+    if (!widget.hasPassword) return null;
+    if ((value ?? '').isEmpty) return 'Password saat ini wajib diisi';
+    return null;
+  }
+
+  String? _validateNew(String? value) {
+    final v = value ?? '';
+    if (v.length < 8) return 'Minimal 8 karakter';
+    if (v.length > 128) return 'Maksimal 128 karakter';
+    return null;
+  }
+
+  String? _validateConfirm(String? value) {
+    if (value != _newController.text) return 'Konfirmasi password tidak cocok';
+    return null;
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _saving = true;
+      _errorText = null;
+    });
+
+    try {
+      await AuthService.instance.updatePassword(
+        currentPassword: widget.hasPassword ? _currentController.text : null,
+        newPassword: _newController.text,
+      );
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.hasPassword ? 'Password berhasil diubah' : 'Password berhasil ditambahkan'),
+          ),
+        );
+      }
+    } on AuthException catch (e) {
+      setState(() => _errorText = e.message);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _BottomSheetShell(
+      title: widget.hasPassword ? 'Ganti Password' : 'Tambahkan Password',
+      formKey: _formKey,
+      saving: _saving,
+      onSave: _save,
+      errorText: _errorText,
+      fields: [
+        if (widget.hasPassword) ...[
+          TextFormField(
+            controller: _currentController,
+            autofocus: true,
+            obscureText: true,
+            validator: _validateCurrent,
+            decoration: InputDecoration(
+              labelText: 'Password saat ini',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        TextFormField(
+          controller: _newController,
+          autofocus: !widget.hasPassword,
+          obscureText: true,
+          validator: _validateNew,
+          decoration: InputDecoration(
+            labelText: 'Password baru',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _confirmController,
+          obscureText: true,
+          textInputAction: TextInputAction.done,
+          validator: _validateConfirm,
+          onFieldSubmitted: (_) => _saving ? null : _save(),
+          decoration: InputDecoration(
+            labelText: 'Konfirmasi password baru',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Bungkus bottom sheet form yang dipakai bersama oleh sheet username & password.
+class _BottomSheetShell extends StatelessWidget {
+  final String title;
+  final GlobalKey<FormState> formKey;
+  final List<Widget> fields;
+  final bool saving;
+  final String? errorText;
+  final VoidCallback onSave;
+
+  const _BottomSheetShell({
+    required this.title,
+    required this.formKey,
+    required this.fields,
+    required this.saving,
+    required this.onSave,
+    this.errorText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
         left: 20,
@@ -144,7 +379,7 @@ class _EditUsernameSheetState extends State<_EditUsernameSheet> {
         ),
         padding: const EdgeInsets.all(20),
         child: Form(
-          key: _formKey,
+          key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,7 +396,7 @@ class _EditUsernameSheetState extends State<_EditUsernameSheet> {
               ),
               const SizedBox(height: 20),
               Text(
-                'Ubah Username',
+                title,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -169,24 +404,17 @@ class _EditUsernameSheetState extends State<_EditUsernameSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _controller,
-                autofocus: true,
-                textInputAction: TextInputAction.done,
-                validator: _validate,
-                onFieldSubmitted: (_) => _saving ? null : _save(),
-                decoration: InputDecoration(
-                  labelText: 'Username baru',
-                  errorText: _errorText,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
+              ...fields,
+              if (errorText != null) ...[
+                const SizedBox(height: 8),
+                Text(errorText!, style: TextStyle(color: AppColors.error, fontSize: 12.5)),
+              ],
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: _saving ? null : _save,
-                  child: _saving
+                  onPressed: saving ? null : onSave,
+                  child: saving
                       ? const SizedBox(
                           width: 20,
                           height: 20,
@@ -210,7 +438,7 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      padding: const EdgeInsets.only(left: 4, bottom: 8, top: 4),
       child: Text(
         text,
         style: TextStyle(
@@ -253,12 +481,18 @@ class _SettingsTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback? onTap;
+  final Color? titleColor;
+  final Color? iconColor;
+  final Color? iconBg;
 
   const _SettingsTile({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.titleColor,
+    this.iconColor,
+    this.iconBg,
   });
 
   @override
@@ -268,12 +502,15 @@ class _SettingsTile extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: AppColors.primaryFixed,
+          color: iconBg ?? AppColors.primaryFixed,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, color: AppColors.primary, size: 20),
+        child: Icon(icon, color: iconColor ?? AppColors.primary, size: 20),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+      title: Text(
+        title,
+        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: titleColor),
+      ),
       subtitle: Text(subtitle, style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant)),
       trailing: onTap != null ? Icon(Icons.chevron_right, color: AppColors.onSurfaceVariant) : null,
       onTap: onTap,
