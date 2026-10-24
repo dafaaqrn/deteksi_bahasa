@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../app_colors.dart';
 import '../services/api_config.dart';
 import '../services/auth_service.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -122,6 +123,13 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   trailing: Icon(Icons.chevron_right, color: AppColors.onSurfaceVariant),
                   onTap: () {
+                    if (item.$2 == 'Pengaturan') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                      );
+                      return;
+                    }
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('${item.$2} - segera hadir')),
                     );
