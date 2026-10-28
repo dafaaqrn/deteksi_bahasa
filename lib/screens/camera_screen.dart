@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:hand_landmarker/hand_landmarker.dart';
+import '../services/detection_log_service.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -158,7 +159,17 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   void _onSequenceReady(List<List<double>> sequence) {
-    // TODO: setelah model .tflite siap, panggil inference di sini.
+    // TODO: setelah model .tflite siap, panggil inference di sini, lalu:
+    //
+    //   final result = await _runInference(sequence); // -> (word, confidence)
+    //   DetectionLogService.instance.logDetection(
+    //     predictedWord: result.word,
+    //     confidence: result.confidence,
+    //   );
+    //
+    // logDetection() tidak perlu di-await (fire-and-forget) karena memang
+    // dirancang gagal diam-diam kalau backend/koneksi lagi tidak tersedia,
+    // supaya tidak mengganggu alur deteksi real-time di kamera.
     debugPrint('Sequence siap: ${sequence.length} frame x ${sequence[0].length} fitur');
   }
 
