@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../app_colors.dart';
 import '../services/auth_service.dart';
+import '../services/detection_log_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -64,6 +65,17 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ],
                 ),
+                _SectionLabel('Data'),
+                _SettingsCard(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.history_toggle_off,
+                      title: 'Hapus Riwayat Deteksi',
+                      subtitle: 'Menghapus semua riwayat kata yang terdeteksi',
+                      onTap: () => _confirmDeleteHistory(context),
+                    ),
+                  ],
+                ),
                 _SectionLabel('Zona Berbahaya'),
                 _SettingsCard(
                   children: [
@@ -102,6 +114,45 @@ class SettingsScreen extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => _EditPasswordSheet(hasPassword: hasPassword),
     );
+  }
+
+  Future<void> _confirmDeleteHistory(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Hapus semua riwayat?'),
+        content: const Text(
+          'Semua catatan kata yang pernah terdeteksi akan dihapus permanen. '
+          'Ini tidak memengaruhi dataset atau model deteksi.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await DetectionLogService.instance.deleteAll();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Riwayat deteksi berhasil dihapus')),
+        );
+      }
+    } on DetectionLogException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
   }
 
   Future<void> _confirmDeleteAccount(BuildContext context) async {
